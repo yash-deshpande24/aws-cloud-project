@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Cloud Hosting & Networking Project - Main Stack
+  Deploys VPC, EC2, S3, IAM, ELB in a complete production-ready setup.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: cloud-hosting-project
+    Description: Project name used for tagging all resources
+
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+    Description: Deployment environment
+
+  EC2InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t3.micro, t3.small, t3.medium, t3.large]
+    Description: EC2 instance type
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 Key Pair for SSH access
+
+  SSHAllowedCIDR:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: CIDR block allowed for SSH access (restrict in production)
+
+Mappings:
+  AmiMap:
+    us-east-1:
+      AMI: ami-0c02fb55956c7d316
+    us-west-2:
+      AMI: ami-0ceecbb0f30a902a6
+    eu-west-1:
+      AMI: ami-0d71ea30463e0ff49
+
+Resources:
+  # ─── VPC Stack ────────────────────────────────────────────────────────────
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./vpc-stack.yaml
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+
+  # ─── IAM Stack ────────────────────────────────────────────────────────────
+  IAMStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./iam-stack.yaml
+      Parameters:
+        ProjectName: !Ref ProjectName
+
+  # ─── S3 Stack ─────────────────────────────────────────────────────────────
+  S3Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: ./s3-stack.yaml
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+
+  # ─── EC2 / ELB Stack ──────────────────────────────────────────────────────
+  ComputeStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: [VPCStack, IAMStack, S3Stack]
+    Properties:
+      TemplateURL: ./compute-stack.yaml
+      Parameters:
+        ProjectName: !Ref ProjectName
+        Environment: !Ref Environment
+        InstanceType: !Ref EC2InstanceType
+        KeyPairName: !Ref KeyPairName
+        SSHAllowedCIDR: !Ref SSHAllowedCIDR
+        VPCId: !GetAtt VPCStack.Outputs.VPCId
+        PublicSubnet1Id: !GetAtt VPCStack.Outputs.PublicSubnet1Id
+        PublicSubnet2Id: !GetAtt VPCStack.Outputs.PublicSubnet2Id
+        PrivateSubnet1Id: !GetAtt VPCStack.Outputs.PrivateSubnet1Id
+        EC2InstanceProfile: !GetAtt IAMStack.Outputs.EC2InstanceProfile
+        AmiId: !FindInMap [AmiMap, !Ref "AWS::Region", AMI]
+
+Outputs:
+  LoadBalancerDNS:
+    Description: DNS name of the Application Load Balancer
+    Value: !GetAtt ComputeStack.Outputs.LoadBalancerDNS
+
+  S3BucketName:
+    Description: Name of the S3 bucket
+    Value: !GetAtt S3Stack.Outputs.BucketName
+
+  VPCId:
+    Description: VPC ID
+    Value: !GetAtt VPCStack.Outputs.VPCId

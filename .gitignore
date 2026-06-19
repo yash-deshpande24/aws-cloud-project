@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+dist/
+build/
+
+# AWS
+.aws/
+*.pem
+*.key
+creds.json
+secrets.env
+
+# Env files
+.env
+.env.*
+*.local
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.zip
+*.tar.gz
